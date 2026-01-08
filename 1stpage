@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeChat Clone Demo</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-container">
+                <div class="logo">💬</div>
+                <h1>WeChat Clone</h1>
+                <p>Real-time messaging demo</p>
+                <input type="text" id="usernameInput" placeholder="Enter your name" maxlength="20">
+                <button onclick="login()" class="btn-primary">Start Chatting</button>
+            </div>
+        </div>
+
+        <!-- Main Chat Interface -->
+        <div id="mainScreen" class="screen">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <img id="userAvatar" class="avatar" src="https://picsum.photos/seed/user1/40/40.jpg" alt="User">
+                    <span id="headerTitle">Chats</span>
+                </div>
+                <div class="header-right">
+                    <button onclick="showVideoCall()" class="icon-btn"><i class="fas fa-video"></i></button>
+                    <button onclick="showPayment()" class="icon-btn"><i class="fas fa-rupee-sign"></i></button>
+                    <button onclick="showBooking()" class="icon-btn"><i class="fas fa-ticket-alt"></i></button>
+                </div>
+            </div>
+
+            <!-- Chat List -->
+            <div id="chatList" class="chat-list">
+                <div class="chat-item" onclick="openChat('Alice')">
+                    <img src="https://picsum.photos/seed/alice/50/50.jpg" alt="Alice" class="chat-avatar">
+                    <div class="chat-info">
+                        <div class="chat-name">Alice</div>
+                        <div class="chat-preview">Hey! How are you? 👋</div>
+                    </div>
+                    <div class="chat-time">2m</div>
+                </div>
+                <div class="chat-item" onclick="openChat('Bob')">
+                    <img src="https://picsum.photos/seed/bob/50/50.jpg" alt="Bob" class="chat-avatar">
+                    <div class="chat-info">
+                        <div class="chat-name">Bob</div>
+                        <div class="chat-preview">Check out this amazing feature! 🔥</div>
+                    </div>
+                    <div class="chat-time">5m</div>
+                </div>
+                <div class="chat-item" onclick="openChat('Charlie')">
+                    <img src="https://picsum.photos/seed/charlie/50/50.jpg" alt="Charlie" class="chat-avatar">
+                    <div class="chat-info">
+                        <div class="chat-name">Charlie</div>
+                        <div class="chat-preview">Let's do a video call 📹</div>
+                    </div>
+                    <div class="chat-time">1h</div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <button class="nav-item active" onclick="showScreen('chats')">
+                    <i class="fas fa-comment"></i>
+                    <span>Chats</span>
+                </button>
+                <button class="nav-item" onclick="showScreen('contacts')">
+                    <i class="fas fa-address-book"></i>
+                    <span>Contacts</span>
+                </button>
+                <button class="nav-item" onclick="showScreen('discover')">
+                    <i class="fas fa-compass"></i>
+                    <span>Discover</span>
+                </button>
+                <button class="nav-item" onclick="showScreen('me')">
+                    <i class="fas fa-user"></i>
+                    <span>Me</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Individual Chat Screen -->
+        <div id="chatScreen" class="screen">
+            <div class="header">
+                <button onclick="backToChats()" class="icon-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <img id="currentChatAvatar" class="avatar" src="" alt="">
+                <span id="currentChatName"></span>
+                <button onclick="startVideoCall()" class="icon-btn">
+                    <i class="fas fa-video"></i>
+                </button>
+            </div>
+
+            <div id="messagesContainer" class="messages-container">
+                <!-- Messages will appear here -->
+            </div>
+
+            <div class="input-container">
+                <button onclick="toggleEmoji()" class="icon-btn">
+                    <i class="fas fa-smile"></i>
+                </button>
+                <input type="text" id="messageInput" placeholder="Type a message" onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button onclick="startVoiceRecording()" class="icon-btn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>
+
+            <!-- Emoji Picker -->
+            <div id="emojiPicker" class="emoji-picker">
+                <span onclick="addEmoji('😀')">😀</span>
+                <span onclick="addEmoji('😂')">😂</span>
+                <span onclick="addEmoji('❤️')">❤️</span>
+                <span onclick="addEmoji('👍')">👍</span>
+                <span onclick="addEmoji('🔥')">🔥</span>
+                <span onclick="addEmoji('🎉')">🎉</span>
+                <span onclick="addEmoji('👋')">👋</span>
+                <span onclick="addEmoji('😍')">😍</span>
+                <span onclick="addEmoji('🤔')">🤔</span>
+                <span onclick="addEmoji('😎')">😎</span>
+            </div>
+        </div>
+
+        <!-- Video Call Screen -->
+        <div id="videoCallScreen" class="screen">
+            <div class="video-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+            <div class="call-controls">
+                <button onclick="toggleVideo()" class="control-btn">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button onclick="toggleAudio()" class="control-btn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button onclick="endCall()" class="control-btn end-call">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Payment Modal -->
+        <div id="paymentModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Send Payment</h3>
+                    <button onclick="closePayment()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="number" id="paymentAmount" placeholder="Amount (₹)" min="1" max="10000">
+                    <input type="text" id="upiId" placeholder="UPI ID (user@upi)" value="demo@upi">
+                    <button onclick="processPayment()" class="btn-primary">Send Payment</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Book Services</h3>
+                    <button onclick="closeBooking()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="booking-grid">
+                        <div class="booking-item" onclick="bookService('movies')">
+                            <i class="fas fa-film"></i>
+                            <span>Movies</span>
+                        </div>
+                        <div class="booking-item" onclick="bookService('travel')">
+                            <i class="fas fa-train"></i>
+                            <span>Travel</span>
+                        </div>
+                        <div class="booking-item" onclick="bookService('hotels')">
+                            <i class="fas fa-hotel"></i>
+                            <span>Hotels</span>
+                        </div>
+                        <div class="booking-item" onclick="bookService('food')">
+                            <i class="fas fa-utensils"></i>
+                            <span>Food</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice Recording Indicator -->
+        <div id="voiceRecording" class="voice-recording">
+            <div class="recording-indicator">
+                <i class="fas fa-microphone"></i>
+                <span>Recording...</span>
+                <button onclick="stopVoiceRecording()" class="stop-recording">Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
