@@ -1,0 +1,569 @@
+// Global Variables
+let currentUser = '';
+let currentChat = '';
+let socket = null;
+let peer = null;
+let localStream = null;
+let mediaRecorder = null;
+let audioChunks = [];
+
+// Demo Mode - Works without backend server!
+const DEMO_MODE = true;
+
+// Initialize App
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 WeChat Clone Demo Loaded!');
+    setupEventListeners();
+    simulateRealTimeFeatures();
+});
+
+// Login Function
+function login() {
+    const username = document.getElementById('usernameInput').value.trim();
+    if (username.length < 2) {
+        alert('Please enter a valid name (at least 2 characters)');
+        return;
+    }
+    
+    currentUser = username;
+    document.getElementById('userAvatar').src = `https://picsum.photos/seed/${username}/40/40.jpg`;
+    
+    // Hide login screen, show main screen
+    document.getElementById('loginScreen').classList.remove('active');
+    document.getElementById('mainScreen').classList.add('active');
+    
+    console.log(`✅ User logged in: ${username}`);
+    
+    // In demo mode, simulate socket connection
+    if (DEMO_MODE) {
+        simulateSocketConnection();
+    } else {
+        connectToServer();
+    }
+}
+
+// Setup Event Listeners
+function setupEventListeners() {
+    // Message input
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        messageInput.addEventListener('keypress', handleKeyPress);
+    }
+    
+    // Emoji picker
+    document.addEventListener('click', function(e) {
+        const emojiPicker = document.getElementById('emojiPicker');
+        const emojiBtn = e.target.closest('button');
+        
+        if (emojiBtn && emojiBtn.onclick && emojiBtn.onclick.toString().includes('toggleEmoji')) {
+            // Emoji button clicked
+        } else if (emojiPicker && !emojiPicker.contains(e.target)) {
+            emojiPicker.classList.remove('show');
+        }
+    });
+    
+    // Video call buttons
+    const videoCallBtn = document.querySelector('[onclick="showVideoCall()"]');
+    if (videoCallBtn) {
+        videoCallBtn.addEventListener('click', showVideoCall);
+    }
+}
+
+// Simulate Socket Connection (Demo Mode)
+function simulateSocketConnection() {
+    console.log('🔌 Simulating real-time connection...');
+    
+    // Simulate receiving messages
+    setTimeout(() => {
+        receiveMessage('Alice', 'Hey! Welcome to WeChat Clone! 👋');
+    }, 2000);
+    
+    setTimeout(() => {
+        receiveMessage('Bob', 'This demo works without any server! 🔥');
+    }, 5000);
+    
+    setTimeout(() => {
+        receiveMessage('Charlie', 'Try the video call and payment features!');
+    }, 8000);
+}
+
+// Simulate Real-time Features
+function simulateRealTimeFeatures() {
+    // Update chat timestamps
+    setInterval(() => {
+        updateChatTimestamps();
+    }, 60000); // Every minute
+    
+    // Simulate typing indicators
+    setInterval(() => {
+        simulateTyping();
+    }, 15000); // Every 15 seconds
+}
+
+// Screen Navigation
+function showScreen(screenName) {
+    // Hide all screens
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+    
+    // Show requested screen
+    const screenMap = {
+        'chats': 'mainScreen',
+        'contacts': 'mainScreen',
+        'discover': 'mainScreen',
+        'me': 'mainScreen'
+    };
+    
+    const screenId = screenMap[screenName] || 'mainScreen';
+    document.getElementById(screenId).classList.add('active');
+    
+    // Update bottom nav
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const navItems = document.querySelectorAll('.nav-item');
+    if (screenName === 'chats') navItems[0].classList.add('active');
+    if (screenName === 'contacts') navItems[1].classList.add('active');
+    if (screenName === 'discover') navItems[2].classList.add('active');
+    if (screenName === 'me') navItems[3].classList.add('active');
+}
+
+// Open Chat with User
+function openChat(userName) {
+    currentChat = userName;
+    
+    // Update chat header
+    document.getElementById('currentChatName').textContent = userName;
+    document.getElementById('currentChatAvatar').src = `https://picsum.photos/seed/${userName}/40/40.jpg`;
+    
+    // Show chat screen
+    document.getElementById('mainScreen').classList.remove('active');
+    document.getElementById('chatScreen').classList.add('active');
+    
+    // Clear and load messages
+    const messagesContainer = document.getElementById('messagesContainer');
+    messagesContainer.innerHTML = '';
+    
+    // Add some demo messages
+    addMessageToChat('Hey there! How are you?', 'contact', new Date(Date.now() - 300000));
+    addMessageToChat('I\'m doing great! Just testing this awesome demo 😊', 'user', new Date(Date.now() - 240000));
+    addMessageToChat('The video call feature is really cool!', 'contact', new Date(Date.now() - 180000));
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Back to Chats
+function backToChats() {
+    document.getElementById('chatScreen').classList.remove('active');
+    document.getElementById('mainScreen').classList.add('active');
+}
+
+// Send Message
+function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const message = input.value.trim();
+    
+    if (message === '') return;
+    
+    addMessageToChat(message, 'user', new Date());
+    input.value = '';
+    
+    // Simulate reply in demo mode
+    if (DEMO_MODE) {
+        setTimeout(() => {
+            const replies = [
+                'That\'s interesting! Tell me more 😊',
+                'I agree with you completely! 👍',
+                'Wow, that sounds amazing! 🎉',
+                'Thanks for sharing that with me!',
+                'I\'m really impressed with this demo!',
+                'The real-time features work great! 🔥'
+            ];
+            const randomReply = replies[Math.floor(Math.random() * replies.length)];
+            receiveMessage(currentChat, randomReply);
+        }, 1000 + Math.random() * 2000);
+    }
+}
+
+// Receive Message
+function receiveMessage(sender, message) {
+    addMessageToChat(message, 'contact', new Date());
+    
+    // Update chat preview in chat list
+    const chatItems = document.querySelectorAll('.chat-item');
+    chatItems.forEach(item => {
+        const nameElement = item.querySelector('.chat-name');
+        if (nameElement && nameElement.textContent === sender) {
+            const previewElement = item.querySelector('.chat-preview');
+            if (previewElement) {
+                previewElement.textContent = message;
+            }
+        }
+    });
+}
+
+// Add Message to Chat
+function addMessageToChat(text, sender, timestamp) {
+    const messagesContainer = document.getElementById('messagesContainer');
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender === 'user' ? 'own' : ''}`;
+    
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'message-bubble';
+    bubbleDiv.textContent = text;
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = formatTime(timestamp);
+    
+    messageDiv.appendChild(bubbleDiv);
+    messageDiv.appendChild(timeDiv);
+    
+    messagesContainer.appendChild(messageDiv);
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Handle Key Press
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+// Format Time
+function formatTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 60000) return 'now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+    return date.toLocaleDateString();
+}
+
+// Update Chat Timestamps
+function updateChatTimestamps() {
+    const chatItems = document.querySelectorAll('.chat-item');
+    chatItems.forEach(item => {
+        const timeElement = item.querySelector('.chat-time');
+        if (timeElement) {
+            // Simulate updating timestamps
+            const currentTime = timeElement.textContent;
+            if (currentTime.includes('m')) {
+                const minutes = parseInt(currentTime);
+                timeElement.textContent = `${minutes + 1}m`;
+            }
+        }
+    });
+}
+
+// Simulate Typing
+function simulateTyping() {
+    const typingUsers = ['Alice', 'Bob', 'Charlie'];
+    const randomUser = typingUsers[Math.floor(Math.random() * typingUsers.length)];
+    
+    // This would show typing indicator in a real app
+    console.log(`${randomUser} is typing...`);
+}
+
+// Emoji Functions
+function toggleEmoji() {
+    const emojiPicker = document.getElementById('emojiPicker');
+    emojiPicker.classList.toggle('show');
+}
+
+function addEmoji(emoji) {
+    const input = document.getElementById('messageInput');
+    input.value += emoji;
+    input.focus();
+    document.getElementById('emojiPicker').classList.remove('show');
+}
+
+// Video Call Functions
+function showVideoCall() {
+    alert('🎥 Video Call Feature!\n\nIn a real app, this would initiate a WebRTC video call. For demo purposes, click on a chat and use the video button there.');
+}
+
+function startVideoCall() {
+    if (DEMO_MODE) {
+        alert(`📹 Starting video call with ${currentChat}...\n\nThis demo simulates video calling. In a real app, WebRTC would handle the connection.`);
+        
+        // Show video call screen
+        document.getElementById('chatScreen').classList.remove('active');
+        document.getElementById('videoCallScreen').classList.add('active');
+        
+        // Simulate video streams
+        simulateVideoCall();
+    } else {
+        initializeWebRTC();
+    }
+}
+
+function simulateVideoCall() {
+    // Create fake video streams
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    
+    // Create canvas for fake video
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw something on canvas
+    ctx.fillStyle = '#07C160';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText('Demo Video', 100, 120);
+    
+    // Convert to video stream
+    const stream = canvas.captureStream(30);
+    localVideo.srcObject = stream;
+    
+    // Simulate remote video
+    const remoteCanvas = document.createElement('canvas');
+    remoteCanvas.width = 320;
+    remoteCanvas.height = 240;
+    const remoteCtx = remoteCanvas.getContext('2d');
+    
+    remoteCtx.fillStyle = '#764ba2';
+    remoteCtx.fillRect(0, 0, remoteCanvas.width, remoteCanvas.height);
+    remoteCtx.fillStyle = 'white';
+    remoteCtx.font = '20px Arial';
+    remoteCtx.fillText(`${currentChat}'s Video`, 80, 120);
+    
+    const remoteStream = remoteCanvas.captureStream(30);
+    remoteVideo.srcObject = remoteStream;
+}
+
+function toggleVideo() {
+    const localVideo = document.getElementById('localVideo');
+    if (localVideo.srcObject) {
+        const tracks = localVideo.srcObject.getVideoTracks();
+        tracks.forEach(track => track.enabled = !track.enabled);
+    }
+}
+
+function toggleAudio() {
+    if (localStream) {
+        const audioTracks = localStream.getAudioTracks();
+        audioTracks.forEach(track => track.enabled = !track.enabled);
+    }
+}
+
+function endCall() {
+    document.getElementById('videoCallScreen').classList.remove('active');
+    document.getElementById('chatScreen').classList.add('active');
+    
+    // Stop video streams
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    
+    if (localVideo.srcObject) {
+        localVideo.srcObject.getTracks().forEach(track => track.stop());
+    }
+    if (remoteVideo.srcObject) {
+        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+    }
+}
+
+// Voice Recording Functions
+function startVoiceRecording() {
+    if (DEMO_MODE) {
+        document.getElementById('voiceRecording').classList.add('show');
+        
+        // Simulate recording
+        setTimeout(() => {
+            stopVoiceRecording();
+        }, 3000);
+        
+        return;
+    }
+    
+    // Real voice recording implementation
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                sendVoiceMessage(audioBlob);
+            };
+            
+            mediaRecorder.start();
+            document.getElementById('voiceRecording').classList.add('show');
+        })
+        .catch(error => {
+            console.error('Error accessing microphone:', error);
+            alert('Unable to access microphone. Please allow microphone access.');
+        });
+}
+
+function stopVoiceRecording() {
+    document.getElementById('voiceRecording').classList.remove('show');
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    if (DEMO_MODE) {
+        // Simulate sending voice message
+        addMessageToChat('🎤 Voice Message (3s)', 'user', new Date());
+        
+        setTimeout(() => {
+            receiveMessage(currentChat, '🎤 Voice Message (2s)');
+        }, 1500);
+    }
+}
+
+function sendVoiceMessage(audioBlob) {
+    // In a real app, upload audio and send message
+    addMessageToChat('🎤 Voice Message', 'user', new Date());
+}
+
+// Payment Functions
+function showPayment() {
+    document.getElementById('paymentModal').classList.add('show');
+}
+
+function closePayment() {
+    document.getElementById('paymentModal').classList.remove('show');
+}
+
+function processPayment() {
+    const amount = document.getElementById('paymentAmount').value;
+    const upiId = document.getElementById('upiId').value;
+    
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+    }
+    
+    if (!upiId || !upiId.includes('@')) {
+        alert('Please enter a valid UPI ID');
+        return;
+    }
+    
+    // Simulate payment processing
+    alert(`💳 Processing payment of ₹${amount} to ${upiId}...\n\nThis demo simulates UPI payment. In a real app, this would integrate with payment gateways.`);
+    
+    closePayment();
+    
+    // Show success message
+    setTimeout(() => {
+        alert('✅ Payment successful! (Demo)');
+    }, 2000);
+}
+
+// Booking Functions
+function showBooking() {
+    document.getElementById('bookingModal').classList.add('show');
+}
+
+function closeBooking() {
+    document.getElementById('bookingModal').classList.remove('show');
+}
+
+function bookService(service) {
+    const services = {
+        movies: '🎬 BookMyShow Integration',
+        travel: '🚂 IRCTC/RedBus Integration', 
+        hotels: '🏨 OYO/Treebo Integration',
+        food: '🍔 Swiggy/Zomato Integration'
+    };
+    
+    alert(`${services[service]}\n\nThis demo shows booking service integration. In a real app, this would redirect to the respective service.`);
+    closeBooking();
+}
+
+// WebRTC Functions (for real deployment)
+function initializeWebRTC() {
+    if (!socket) {
+        alert('❌ Not connected to server. Using demo mode.');
+        return;
+    }
+    
+    // Real WebRTC implementation would go here
+    console.log('Initializing WebRTC...');
+}
+
+// Server Connection (for real deployment)
+function connectToServer() {
+    try {
+        socket = io('ws://localhost:3000', {
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('✅ Connected to server');
+            socket.emit('userJoined', currentUser);
+        });
+        
+        socket.on('message', (data) => {
+            receiveMessage(data.sender, data.text);
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ Disconnected from server');
+        });
+        
+    } catch (error) {
+        console.error('Connection error:', error);
+        alert('Could not connect to server. Running in demo mode.');
+        DEMO_MODE = true;
+        simulateSocketConnection();
+    }
+}
+
+// Utility Functions
+function generateQRCode(text) {
+    // Simple QR code generation (demo version)
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 200;
+    canvas.height = 200;
+    
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = 'black';
+    for (let i = 0; i < 20; i++) {
+        for (let j = 0; j < 20; j++) {
+            if (Math.random() > 0.5) {
+                ctx.fillRect(i * 10, j * 10, 10, 10);
+            }
+        }
+    }
+    
+    return canvas.toDataURL();
+}
+
+// Initialize everything when page loads
+window.addEventListener('load', function() {
+    console.log('🎯 WeChat Clone Demo Ready!');
+    console.log('📱 Features: Messaging, Video Calls, Voice Messages, Payments, Booking');
+    console.log('🔧 This demo works completely offline!');
+    
+    // Add some interactive effects
+    document.querySelectorAll('.chat-item').forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateX(5px)';
+        });
+        
+        item.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateX(0)';
+        });
+    });
+});
